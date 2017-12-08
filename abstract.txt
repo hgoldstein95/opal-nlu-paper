@@ -1,0 +1,12 @@
+Typed Interactions for NLU in Opal
+
+Natural Language Understanding (NLU) is a machine learning technique designed to
+extract meaning from human language, and it is becoming increasingly prevalent
+when writing applications like chat bots and personal assistants. While NLU
+libraries are becoming more and more powerful, they are often cumbersome to
+configure and provide little to no type safety.
+
+This work contributes tools for interacting with NLU libraries, and adds them to
+the Opal programming languge and ecosystem. It revolves around a simple DSL for
+simultaneously writing program types and NLU configuration, providing a
+type-safe way to interact with the NLU backend.
