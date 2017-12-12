@@ -51,16 +51,19 @@
 \newcommand{\lit}[1]{\text{``#1''}}
 \newcommand{\etag}[1]{\textsf{#1}}
 
-% TODO: acmart, acmsmall
-
 \title{Typed Interactions for NLU in Opal}
 \author{Harrison Goldstein}
 \date{Fall 2017}
 
 \begin{document}
 \maketitle
+
 \begin{abstract}
-  This is an abstract containing relatively abstract things.
+  Natural Language Understanding (NLU) is a powerful tool for modern
+  applications. Interacting with remote NLU engines can be error prone: most
+  backends provide no type guarantees, and configuration synchronization is a
+  constant source of bugs. We present a DSL for configuring a NLU application
+  that ensures synchronization and type-safety.
 \end{abstract}
 
 \section{Introduction} \label{introduction}
@@ -92,14 +95,6 @@ integrate these technologies into their applications by hand. (In fact, machine
 learning in general has been relatively neglected by the programming languages
 community.) We propose an addition to the Opal language that will begin to close
 this gap.
-
-% \subsection{Opal}
-% Opal is a research programming language being developed at Cornell University
-% under the guidance of Professor Adrian Sampson. The language is being developed
-% as an embedded language within Typescript, and it is designed with machine
-% learning applications in mind. Opal supports programming paradigms that fit well
-% with the interactive and unpredictable nature of ML programs, and has libraries
-% for interacting with various types of ML engines.
 
 \subsection{An Example}
 Consider a simple reminder interface to a calendar or other scheduling
@@ -201,8 +196,10 @@ section \ref{formalism}.
 
 \subsection{The DSL}
 With our observations about search strategies in mind, we can write our types
-from before in a slightly different way. Here are the same type declarations
-from section \ref{introduction}, but written in our DSL:
+from before in a slightly different way. Figure \ref{fig:dsl_decls} same type
+declarations from section \ref{introduction} written in our DSL.
+
+\begin{figure}
 \begin{minted}{typescript}
   free-text Msg;
   keywords Time = "later" | "tomorrow";
@@ -214,6 +211,9 @@ from section \ref{introduction}, but written in our DSL:
     | <Set> Set
     | <Get> {};
 \end{minted}
+  \caption{Some DSL declarations.}
+  \label{fig:dsl_decls}
+\end{figure}
 
 The main thing to notice is that the keyword \ts{type} has been replaced by
 entity declarations \ts{free-text}, \ts{keywords}, and \ts{trait}, as well as
@@ -273,7 +273,7 @@ down together. It also prevents the user from having unreasonable expectations
 of the backend, by restricting the types that a user can expect as a response.
 
 Unfortunately, there is still one major issue. The vast majority of NLU engines
-don't return structured data. Instead, they return a bag of entities with no
+do not return structured data. Instead, they return a bag of entities with no
 information about the relationships between them. Figure \ref{fig:nostructure}
 shows a sample response. Recall that in our example, \ts{Msg} and \ts{Time}
 entities were only expected when there was an \ts{Intent} with tag \ts{"Set"}.
@@ -455,9 +455,9 @@ entity from the response.
 \end{align*}
 Perhaps surprisingly, we can use the exact same definition in the Keywords case
 that we did in the FreeText case. We are required to return a value of type
-$\langle {\ell_1 \mid \dots \mid \ell_n} \rangle$, but since the NLU engine has
-been configured with the same list of literals, we are guaranteed to get one of
-them back from lookup (assuming lookup is defined).
+$\langle {\ell_1 \mid \dots \mid \ell_n} \rangle$; as long as $r$ is
+well-formed, it will have been configured to have the same list of literals. We
+are guaranteed to get one of them back from lookup.
 \begin{align*}
   \text{parse}(\text{Trait}(\etag{t}, rec), r) = \\
   \text{parseTy}(rec[\text{lookup}(\etag{t}, r)], r)
@@ -476,6 +476,9 @@ Given a declaration $d$, we generate a configuration, cfg. Then,
   &\forall\ (r : \textsf{Resp}).\\
   &r\ \text{well-formed}_{\text{cfg}} \Rightarrow \text{parse}(d, r)\ \text{defined}
 \end{flalign*}
+Note that since parse is a dependent function, it will already return a value of
+the correct type. Thus, we only need to care that it is defined. Proof of this
+fact is clear by induction on $d$.
 
 \section{Implementation} \label{implementation}
 
@@ -491,19 +494,125 @@ obviously correct. We use the Parsec library to parse the type DSL into the
 intermediate representation mentioned above in figure \ref{fig:ast}.
 
 \subsection{Runtime Library}
+At run-time typical application using NLU will go through a fairly consistent
+cycle.
+\begin{enumerate}
+\item Ask user for input, converting voice to text if necessary.
+\item Query the NLU engine and obtain a response for the given input.
+\item Parse the response into application data.
+\item Process parsed data, and repeat.
+\end{enumerate}
+Steps 1 and 4 are generally application-specific, so we have elected to provide
+a library which handles steps 2 and 4. For each backend that Opal
+supports,\footnote{At the time of writing, Wit is the only supported backend.}
+we provide utilities for querying the API and parsing the response data. The
+network code involved in obtaining the response is fairly uninteresting, so we
+will focus on the parsing,
+
+In section \ref{formalism}, we outline the parse function, which takes a
+declaration and a response and generates an Opal object. The function that we
+provide in the Opal library is similar, but there are two important differences.
+First, the parse function takes some element of $\fcy{D}$, which it uses to
+deduce the structure of the desired output. In the real application, the analog
+of $\fcy{D}$ is the \hs{Decl} type in the Haskell code; this is not available to
+the Opal application at run time. As mentioned above, we get around this by
+using a modified version the runtypes library to keep this information around at
+run-time. We extend runtypes to include a type for entities---which map to
+declarations in $\fcy{D}$. Runtypes provides the infrastructure for non-entity
+types in $\fcy{T}$.
+
+The other difference arises because Opal does not have dependent types. We
+cannot completely faithfully transcribe the parse function from above, because
+it is not obvious that it can be typed at all. The solution here is to combine
+Opal's dynamic typing with runtypes' dynamic checking feature to create a
+function that appears to be dependently typed. First, we use dynamic types
+within the parse function. While building the response data, we assume, where
+necessary, that it has type \ts{any}. Then, once parsing is complete, we use the
+runtypes object to check the parsed object, and we cast it to the desired type.
+The definition is shown in figure \ref{fig:parse}. The cast is safe, so long as
+the user respects the invariant that parse is always called with compatible type
+and runtype parameters.
+
+\begin{figure*}
+\begin{minted}{typescript}
+          public parse<T>(rt: Runtype<any>, res: Response): T {
+              return rt.check(this._parse(rt, res)) as T;
+          }
+
+          private _parse(rt: Runtype<any>, res: Response): any { ... }
+\end{minted}
+  \caption{The wit parse functions.}
+  \label{fig:parse}
+\end{figure*}
 
 \section{Evaluation} \label{evaluation}
-Talk about how great we did.
+%TODO: Cover limitations of the design, possible use-cases, etc
 
 \section{Future Work} \label{future}
-{\bf Brain Dump}
-\begin{itemize}
-\item More types (include Wit builtins)
-\item More backends
-\item Use confidence information
-\item Unit tests as training samples
-\end{itemize}
+Moving forward, we hope to take this work in two main directions---wider support
+for NLU features and backends and entirely new features.
+
+\subsection{Wider Support}
+Expanding support for more entity types and backends is an obvious way to
+increase the usefulness of our work. Here, we discuss both of those extensions
+in detail.
+
+\subsubsection{More Types}
+In addition to the three ``universal'' kinds of entities (free-text, keywords,
+and traits), the Wit NLU engine provides more specialized ways of looking up
+entities. Wit provides support for parsing numbers, dates, times, and other
+specific forms of text. We elected to keep things simple at first and exclude
+these built-in entities, but adding support for them seems like a very
+reasonable next-step.
+
+At a first approximation, this would require modifying the definitions of
+$\fcy{D}$ and $\tau$ to include declarations for built-in entities and
+base types for the data associated with those entities. More work needs to be
+done exploring this space before any more specific conclusions can be drawn.
+
+\subsubsection{More Backends}
+We are also interested exploring NLU engines beyond Wit. One reason for this is
+purely practical---users might want to use other backends, and it would be nice
+for Opal to support this. Another reason, however, is more academic. Exploring
+other NLU engines would give us opportunities to test the generality of our
+current design. Preliminary research suggests that building our type system
+around entities and search strategies makes sense, but we can only know that for
+sure if we try to build interfaces for more engines.
+
+\subsection{Interesting Features}
+There are a number of novel research directions available as extensions to this
+project. The following are two of the many ideas that we have had.
+
+\subsubsection{Confidence-Based Parsing}
+Up to this point, we have assumed very little about the data returned in the NLU
+response. In practice, however, many NLU engines provide more than just
+information about the matched entities. Wit, in particular, provides confidence
+levels for each entitiy that it finds. Thus, a value like \ts{"Set"} might be
+paired with a confidence level of $70\%$, meaning that Wit is $70\%$ sure that
+the user's intent is actually to set a new reminder.
+
+As of now, we do not actually use this information. In the majority of cases
+that we have tested, a Wit bot either has enough information to get the right
+entities, or it does not. However, it is possible that as we attempt to support
+new types of entities and as user types get more complicated, it will be useful
+to try multiple parses of a single response. In that case, we can choose between
+different parses using confidence scores.
+
+\subsubsection{Training with Tests}
+A final extension of this project would attempt to close the code/configuration
+gap even further by allowing users to train their NLU application in a way that
+is guaranteed to support their tests. We would accomplish this using the same
+idea behind our type DSL---we introduce a new DSL (or an extension to the
+current one) for generating both Wit training examples and application tests.
+While synchronization is less of an issue with training than it is with
+configuration, it would still be extremely convenient to express the entirety of
+the application's behavior in one place.
+
+Exploring this path would require a fair amount of implementation work, but we
+would also need to take great care to avoid overfitting. It is unclear to what
+extent this would become an issue.
 
 \section{Conclusion} \label{conclusion}
+% TODO: Write
 
 \end{document}
