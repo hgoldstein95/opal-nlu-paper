@@ -51,6 +51,8 @@
 \newcommand{\lit}[1]{\text{``#1''}}
 \newcommand{\etag}[1]{\textsf{#1}}
 
+\newcommand{\ff}[1]{\textsf{#1}}
+
 \title{Typed Interactions for NLU in Opal}
 \author{Harrison Goldstein}
 \date{Fall 2017}
@@ -232,7 +234,7 @@ always tagged unions, we can write them in (almost) ML syntax, rather than
 writing out the idiomatic Typescript workaround.
 
 Finally, writing specific entity declarations rather than just \ts{type}, makes
-it clear that there is more going on than a direct translation into typescript.
+it clear that there is more going on than a direct translation into Typescript.
 In fact, the DSL parser does lot of validation to guarantee that only reasonable
 types can be written down. For example, a \ts{keywords} declaration is required
 to be a union, and that union must contain only literals. Even the \ts{alias}
@@ -321,8 +323,8 @@ just during setup.
   \label{fig:process}
 \end{figure*}
 
-We elected to use a typescript library called \emph{runtypes} to serialize the
-AST directly into typescript; this gives us a data structure to guide response
+We elected to use a Typescript library called \emph{runtypes} to serialize the
+AST directly into Typescript; this gives us a data structure to guide response
 parsing, and also provides us a way to dynamically type-check the results. We
 discuss the response parsing algorithm in more detail in section
 \ref{implementation}.
@@ -338,7 +340,7 @@ is ready to go.
 \section{Formalism} \label{formalism}
 In order to reason about the correctness of our translations, we have formalized
 the results from section \ref{description}. We begin by formalizing the type DSL
-as a pseuo-BNF grammar. This is shown in figure \ref{fig:grammar_a}.
+as shown in figure \ref{fig:grammar_a}.
 \begin{figure}
   \centering
   \begin{subfigure}{1\linewidth}
@@ -349,7 +351,7 @@ as a pseuo-BNF grammar. This is shown in figure \ref{fig:grammar_a}.
       \\
       \fcy{T} ::=&\ \fcy{D} \mid \ell \mid \{s: \fcy{T}\}
     \end{align*}
-    $$ \etag{t} \in \textsf{Tag} \qquad \ell, s \in \textbf{string} $$
+    $$ \etag{t} \in \ff{Tag} \qquad \ell, s \in \textbf{string} $$
     \caption{Type DSL}
     \label{fig:grammar_a}
   \end{subfigure}\vspace{1cm}
@@ -361,14 +363,15 @@ as a pseuo-BNF grammar. This is shown in figure \ref{fig:grammar_a}.
   \end{subfigure}
   \caption{Formal grammars.}
 \end{figure}
-There are similarities between these definitions and the haskell ones in figure
-\ref{fig:ast}, but it has some slightly different goals. First, we remove
+There are similarities between these definitions and the Haskell ones in figure
+\ref{fig:ast}, but these have some slightly different goals. First, we remove
 aliases and require that all type definitions are written ``in-line''. Next,
 rather than split the definition by allowing tags within $\fcy{T}$, we also
 require that entitiy definitions are inlined. This means that the data a user
 expects from the NLU backend can be represented by a single tree of type
-$\fcy{D}$. Importantly, none of these simplifications are fundamental---they
-simply remove some aspects of the system that make it easier to use in practice.
+$\fcy{D}$. Importantly, none of these simplifications are fundamental---this
+formulation can represent the same types as the actual system. This approach
+simply gives up some usability to simplify reasoning.
 
 In addition to a grammar for the DSL itself, in figure \ref{fig:grammar_b} we
 define a grammar of types, $\tau$ which will represent Opal types specifically.
@@ -385,8 +388,8 @@ and configuration information, we would like a way to compute just the
 following mutually recursive functions, which traverse a declaration and
 construct a single type in $\tau$.
 \begin{align*}
-  \text{interp}\ &:\ \fcy{D} \to \tau \\
-  \text{interpTy}\ &:\ \fcy{T} \to \tau
+  \ff{interp}\ &:\ \fcy{D} \to \tau \\
+  \ff{interpTy}\ &:\ \fcy{T} \to \tau
 \end{align*}
 
 With the basic building blocks defined, we can move forward in formalizing our
@@ -396,35 +399,34 @@ system. \fxnote{Should I write out implementations?}
 The first step that our system takes is configuration. In practice, this is a
 two-part process: the user needs to extract the appropriate Opal code as well as
 the configuration for the NLU backend. The first step is covered by our
-definition of interp. Since we are taking $\tau$ as an analog for relevant Opal
-types, the type generation process is exactly the execution of interp on the
-top-level entity declaration.
+definition of \ff{interp}. Since we are taking $\tau$ as an analog for relevant
+Opal types, the type generation process is exactly the execution of \ff{interp}
+on the top-level entity declaration.
 
 As for the second step, we would like the NLU backend to be set up such that its
 responses are \emph{well-formed} with respect to the configuration. Intuitively,
 any time we look up some entity tag in the response, we would like to get data
 that is compatible with that entity's declaration. We define a type,
-\textsf{Resp} of responses, and require that a lookup function exists, with the
-following type:
-$$ \text{lookup}\ :\ \textsf{Tag} \to \textsf{Resp} \rightharpoonup
-\textbf{string} $$
+\textsf{Resp} of responses, and require that a \ff{lookup} function exists, with
+the following type:
+$$ \ff{lookup}\ :\ \ff{Tag} \to \ff{Resp} \rightharpoonup \textbf{string} $$
 Note that the function is partial; there is no guarantee that the response will
-contain the desired data. In the sequel, we will often assume that lookup is
-defined on tags we care about, but that assumption will be stated explicitly
+contain the desired data. In the sequel, we will often assume that \ff{lookup}
+is defined on tags we care about, but that assumption will be stated explicitly
 rather than assumed by default.
 
-The lookup function always returns a string, but the string might mean any
+The \ff{lookup} function always returns a string, but the string might mean any
 number of things. The data might be a particular literal, in the case of a
 keywords or trait entity, or an entire phrase in the case of a free-text entity.
 We define configurations as functions that map a subset of entity tags to the
 type of data expected for those entities.
-$$ \textsf{Cfg} \equiv \textsf{Tag} \rightharpoonup \tau $$
-Now, we call a response well-formed with respect to $\text{cfg} : \textsf{Cfg}$
-if and only if it returns appropriate data on lookup. More formally, for some $r
-: \textsf{Resp}$,
+$$ \ff{Cfg} \equiv \ff{Tag} \rightharpoonup \tau $$
+Now, we call a response well-formed with respect to $\ff{cfg} : \ff{Cfg}$ if and
+only if it returns appropriate data on \ff{lookup}. More formally, for some $r :
+\ff{Resp}$,
 \begin{align*}
   &r\ \text{well-formed}_{\text{cfg}} \iff \\
-  &\forall (\etag{t} : \textsf{Tag}).\ \text{cfg}(\etag{t})\ \text{defined} \Rightarrow \text{lookup}(\etag{t}, r) : \text{cfg(\etag{t})}
+  &\forall (\etag{t} : \textsf{Tag}).\ \ff{cfg}(\etag{t})\ \text{defined} \Rightarrow \ff{lookup}(\etag{t}, r) : \ff{cfg}(\etag{t})
 \end{align*}
 
 \subsection{Response Parsing}
@@ -433,59 +435,60 @@ response from the NLU engine into data of the appropriate types. This section
 will formalize that problem and present our solution.
 
 Our goal will be to write a parsing function which takes a declaration, $d$, and
-a response, and produces a value of type interp($d$). We will again write two
-mutually recursive functions, parse and parseTy, with types:
+a response, and produces a value of type \ff{interp}($d$). We will again write
+two mutually recursive functions, \ff{parse} and \ff{parseTy}, with types:
 \begin{align*}
-\text{parse}\ &:\ \Pi_{(d : \fcy{D})}. \textsf{Resp} \rightharpoonup \text{interp}(d) \\
-\text{parseTy}\ &:\ \Pi_{(t : \fcy{T})}. \textsf{Resp} \rightharpoonup \text{interp}(t)
+\ff{parse}\ &:\ \Pi_{(d : \fcy{D})}. \textsf{Resp} \rightharpoonup \ff{interp}(d) \\
+\ff{parseTy}\ &:\ \Pi_{(t : \fcy{T})}. \textsf{Resp} \rightharpoonup \ff{interp}(t)
 \end{align*}
 Since we need the type of the result to depend on the declaration, these are
 dependent functions. The functions are also partial because lookups might fail.
 
-We will define parse by case analysis on the declaration.
+We will define \ff{parse} by case analysis on the declaration.
 \begin{align*}
-  \text{parse}(\text{FreeText}(\etag{t}), r) = \text{lookup}(\etag{t}, r)
+  \ff{parse}(\text{FreeText}(\etag{t}), r) = \ff{lookup}(\etag{t}, r)
 \end{align*}
 This case is fairly straightforward. Since the interpretation of a free-text
-entity is just a string, we can simply look up the value of the appropriate
-entity from the response.
+entity is just a {\bf string}, we can simply look up the value of the
+appropriate entity from the response.
 \begin{align*}
-  \text{parse}(\text{Keywords}(\etag{t}, [\ell_1, \dots, \ell_n]), r) =\\
-  \text{lookup}(\etag{t}, r)
+  \ff{parse}(\text{Keywords}(\etag{t}, [\ell_1, \dots, \ell_n]), r) =\\
+  \ff{lookup}(\etag{t}, r)
 \end{align*}
 Perhaps surprisingly, we can use the exact same definition in the Keywords case
 that we did in the FreeText case. We are required to return a value of type
 $\langle {\ell_1 \mid \dots \mid \ell_n} \rangle$; as long as $r$ is
 well-formed, it will have been configured to have the same list of literals. We
-are guaranteed to get one of them back from lookup.
+are guaranteed to get one of them back from \ff{lookup}.
 \begin{align*}
-  \text{parse}(\text{Trait}(\etag{t}, rec), r) = \\
-  \text{parseTy}(rec[\text{lookup}(\etag{t}, r)], r)
+  \ff{parse}(\text{Trait}(\etag{t}, rec), r) = \\
+  \ff{parseTy}(rec[\ff{lookup}(\etag{t}, r)], r)
 \end{align*}
-The final case for parse simply matches the value in the response to an index
-into the record, and interprets that record entry using parseTy.
+The final case for \ff{parse} simply matches the value in the response to an
+index into the record, and interprets that record entry using \ff{parseTy}.
 
-We will not write out the full definition of parseTy, but note that it is fairly
-automatic. If the type is another declaration, we can call back to parse, if it
-is a literal we simply generate the appropriate string, and if it is a record,
-we build the appropriate record and recursively build out its fields.
+We will not write out the full definition of \ff{parseTy}, but note that it is
+fairly automatic. If the type is another declaration, we can call back to
+\ff{parse}, if it is a literal we simply generate the appropriate string, and if
+it is a record, we build the appropriate record and recursively build out its
+fields.
 
 \subsection{Correctness}
-Given a declaration $d$, we generate a configuration, cfg. Then,
+Given a declaration $d$, we generate a configuration, \ff{cfg}. Then,
 \begin{flalign*}
   &\forall\ (r : \textsf{Resp}).\\
   &r\ \text{well-formed}_{\text{cfg}} \Rightarrow \text{parse}(d, r)\ \text{defined}
 \end{flalign*}
-Note that since parse is a dependent function, it will already return a value of
-the correct type. Thus, we only need to care that it is defined. Proof of this
-fact is clear by induction on $d$.
+Note that since \ff{parse} is a dependent function, it will already return a
+value of the correct type. Thus, we only need to care that it is defined. Proof
+of this fact is clear by induction on $d$.
 
 \section{Implementation} \label{implementation}
 
 \subsection{Configuration Tool}
 When a user wants to configure an Opal application to interact with an NLU
 library like Wit, they begin by using our configuration tool. The tool turns
-code in the type DSL into typescript code and JSON configuration, and ensures
+code in the type DSL into Typescript code and JSON configuration, and ensures
 that the NLU engine responses will agree with the type definitions in the user's
 application.
 
@@ -613,6 +616,9 @@ would also need to take great care to avoid overfitting. It is unclear to what
 extent this would become an issue.
 
 \section{Conclusion} \label{conclusion}
-% TODO: Write
+The Opal langauge hopes to be the ideal language for building modern
+applications that leverage machine learning techniques. As NLU becomes more and
+more popular as a user interface, it makes sense that Opal would provide a clean
+and safe interface for natural langauge interaction.
 
 \end{document}
