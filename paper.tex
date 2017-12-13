@@ -141,20 +141,33 @@ data representation of a user utterance.
 \end{figure}
 
 \subsection{Types for NLU}
-If one were to try to implement our reminder interface na\"ively, a problem
-would arise: the popular backends provide untyped interfaces and require
-external configuration. Since Opal hopes to provide a consistent and safe
-interface to multiple NLU engines, we decided to develop a typed abstraction for
-natural language systems.
+If a programmer simply wrote down types like the ones above, set up their NLU
+engine, and started their application, there would be a problem. Since there is
+no connection between the types and the NLU configuration, these types could
+actually be unsound! If the programmer made a mistake in \emph{either} the types
+\emph{or} the configuration, the application would be unusable and no compiler
+could possibly know. Bugs like these are particularly insidious because they
+might be mistaken as network errors or even just as an indicator of
+under-training.
 
-In this work, we present a domain specific language (DSL) for simultaneously
+In this work, we set out to connect the types and the NLU configuration,
+allowing the programmer to avoid these awful bugs. There are a few ways that one
+might try to do this. First, the programmer could write down the NLU
+configuration and extract the types from it. This is pretty much a non-starter,
+since there is fundamentally less information in the NLU configuration than
+there is in the type definitions. Instead, the programmer could write the types,
+and extract the NLU information from those. This approach is more feasible, but
+it would require some kinds of annotations in the types to capture
+implementation-specific properties of the configuration.
+
+We present a third option: a domain specific language (DSL) for simultaneously
 specifying
 \begin{itemize}
 \item configuration for an NLU engine;
 \item a typed interface for responses
 \end{itemize}
-We also implement translations from our DSL to various artifacts which can be
-integrated with Opal applications.
+This allows the user to tune the configuration as much as they need, to write
+useful types, and to ensure that these two artifacts are always compatible.
 \\
 
 We will begin by presenting a technical description of our type language in
@@ -204,15 +217,15 @@ declarations from Section \ref{introduction} written in our DSL.
 
 \begin{figure}
 \begin{minted}{typescript}
-  free-text Msg;
-  keywords Time = "later" | "tomorrow";
+  free-text Msg
+  keywords Time = "later" | "tomorrow"
   alias Set = {
     msg: Msg,
     time: Time
-  };
+  }
   trait Intent =
     | <Set> Set
-    | <Get> {};
+    | <Get> {}
 \end{minted}
   \caption{Some DSL declarations.}
   \label{fig:dsl_decls}
@@ -285,9 +298,9 @@ entirely.
 \begin{figure}
 \begin{minted}{typescript}
   {
-    Intent: "Set",
-    Msg: "pick up the dry cleaning",
-    Time: "later"
+    Intent: ["Set"],
+    Msg: ["pick up the dry cleaning"],
+    Time: ["later"]
   }
 \end{minted}
   \caption{The unstructured response for the utterance: \emph{Remind me later to
@@ -295,46 +308,30 @@ entirely.
   \label{fig:nostructure}
 \end{figure}
 
-In order to reconstruct the desired data from the NLU backend's response, we
-realized that it was necessary to keep data from the DSL around at run-time, not
-just during setup.
+This makes it necessary to have a run-time component of the system that knows
+how to reconstruct structured data from the unstructured response that comes
+from the NLU engine. Building structured data from the response is a nontrivial
+task. First, it requires that information about the relationships between
+entities and data be available at run-time. This is mostly an engineering
+problem, and our solution is outlined in Section \ref{implementation}.
 
-\begin{figure*}
-  \centering
-  \begin{tikzpicture}[node distance = 3cm, auto]
-    \node [block] (types) {Type DSL};
-    \node [block, right of=types] (decls_hs) {Decl (hs)};
-    \node [block, right of=decls_hs] (decls_ts) {Runtypes (ts)};
-    \node [block, below of=decls_ts] (cfg) {NLU Config};
-    \node [block, above of=decls_ts] (ts_types) {Types (ts)};
-    \node [cloud, right of=decls_ts] (ts) {Opal};
-    \node [cloud, right of=cfg] (backend) {Wit};
-
-    \path [line] (types) -- (decls_hs);
-    \path [line] (decls_hs) -- (decls_ts);
-    \path [line] (decls_hs) -- (cfg);
-    \path [line] (decls_hs) -- (ts_types);
-    \path [line] (decls_ts) -- (ts);
-    \path [line] (ts_types) -- (ts);
-    \path [line] (cfg) -- (backend);
-  \end{tikzpicture}
-  \caption{The configuration process.}
-  \label{fig:process}
-\end{figure*}
-
-We elected to use a TypeScript library called \emph{runtypes} to serialize the
-AST directly into TypeScript; this gives us a data structure to guide response
-parsing, and also provides us a way to dynamically type-check the results. We
-discuss the response parsing algorithm in more detail in Section
-\ref{implementation}.
-
-Figure \ref{fig:process} shows process of configuring an application for NLU
-interaction. The programmer writes types in our DSL, and uses our Haskell tool
-to parse the declarations. The tool serializes three artifacts: a set of
-TypeScript type declarations, a runtypes datastructure, and a set of JSON
-configuration files for Wit. The programmer simply imports the types and
-runtypes into their Opal project, uploads the JSON files to Wit, and the system
-is ready to go.
+The other difficulty is that the types might admit more than one valid response
+object. To see how this works, imagine that we want to allow a user to set two
+messages at once. We would change the \ts{Set} type to be:
+\begin{minted}{typescript}
+  type Set = {
+    msg1: Msg,
+    msg2: Msg,
+    time: Time
+  };
+\end{minted}
+Unfortunately, this kind of ambiguity makes it impossible to find a principled
+way of parsing a response. Since the backends do not expose ordering
+information, a response with two \ts{Msg} fields might parse to any of four
+different objects. We say four because the reconstruction algorithm might
+reasonably ignore one of the messages and just put the same one for \ts{msg1}
+and \ts{msg2}. For this reason, we impose the restriction that declarations do
+not reuse entities.
 
 \section{Formalism} \label{formalism}
 In order to reason about the correctness of our translations, we have formalized
@@ -355,7 +352,7 @@ as shown in Figure \ref{fig:grammar_a}.
     \label{fig:grammar_a}
   \end{subfigure}\vspace{1cm}
   \begin{subfigure}{1\linewidth}
-    $$ \tau ::=\ \textbf{string} \mid \ell \mid \{s: \tau\} \mid \langle \ell
+    $$ \tau ::=\ \textbf{string} \mid \ell \mid \{s: \tau\} \mid \langle \tau
     \rangle $$
     \caption{Relevant Opal Types}
     \label{fig:grammar_b}
@@ -378,8 +375,8 @@ as representing the final form of the data that a user hopes to obtain, with no
 information about the entities that generated the data. They map almost directly
 into types that are used by the underlying Opal system. We add a few types that
 are noteworthy: the type {\bf string} is added to account for FreeText entities;
-and $\langle {\ell} \rangle$ represents a disjunction of literals, and covers
-the case of Keywords entities.
+and $\langle {\tau} \rangle$ represents an arbitrary union, and covers the cases
+of Keywords and Trait entities.
 
 As mentioned above, user's view of their system can be formalized as a top-level
 declaration generated by $\fcy{D}$. Since this declaration encompases both type
@@ -391,9 +388,30 @@ construct a single type in $\tau$.
   \ff{interp}\ &:\ \fcy{D} \to \tau \\
   \ff{interpTy}\ &:\ \fcy{T} \to \tau
 \end{align*}
+We implement \ff{interp} and \ff{interpTy} in Figure \ref{fig:interp}.
+
+\begin{figure}
+  \centering
+  \begin{flalign*}
+    & \ff{interp}(\text{FreeText}(\etag{t})) = \textbf{string} \\
+    & \ff{interp}(\text{Keywords}(\etag{t}, [\ell])) = \langle \ell \rangle \\
+    & \ff{interp}(\text{Trait}(\etag{t'}, \{s : t\})) = \\
+    & \qquad \left< \{\text{tag}: s,\ \text{data}: \ff{interpTy(t)}\} \right> \\
+    \\
+    & \ff{interpTy}(d) = \ff{interp(d)} \\
+    & \ff{interpTy}(\ell) = \ell \\
+    & \ff{interpTy}(\{s: t\}) = \{s: \ff{interpTy}(t)\}
+  \end{flalign*}
+  \caption{Type interpretation.}
+  \label{fig:interp}
+\end{figure}
+
+One interesting thing to point out is that the record in the Trait declarations
+becomes a union type. This makes sense, since a trait represents a property of
+the utterance as a whole, and thus can decide the structure of the response.
 
 With the basic building blocks defined, we can move forward in formalizing our
-system. \fxnote{Should I write out implementations?}
+system.
 
 \subsection{Configuration Generation}
 The first step that our system takes is configuration. In practice, this is a
@@ -419,21 +437,36 @@ The \ff{lookup} function always returns a string, but the string might mean any
 number of things. The data might be a particular literal, in the case of a
 keywords or trait entity, or an entire phrase in the case of a free-text entity.
 We define configurations as functions that map a subset of entity tags to the
-type of data expected for those entities.
-$$ \ff{Cfg} \equiv \ff{Tag} \rightharpoonup \tau $$
-Now, we call a response well-formed with respect to $\ff{cfg} : \ff{Cfg}$ if and
-only if it returns appropriate data on \ff{lookup}. More formally, for some $r :
+type of data expected for those entities. The function \ff{cfg} takes a
+declaration and produces a configuration for that declaration.
+$$ \ff{cfg}\ :\ \fcy{D} \to \ff{Tag} \rightharpoonup \tau $$
+We define \ff{cfg} in Figure \ref{fig:cfg}. The exact details of the else branch
+of the Trait case are implementation specific, but the basic idea to map the
+\ff{cfg} function over all nested declarations. This achieves the goal of
+capturing every tag in the declaration.
+
+\begin{figure}
+  \centering
+  \begin{flalign*}
+    & \ff{cfg}(\text{FreeText}(\etag{t}), \etag{t}) = \textbf{string} \\
+    & \ff{cfg}(\text{Keywords}(\etag{t}, [\ell]), \etag{t}) = \langle \ell \rangle \\
+    & \ff{cfg}(\text{Trait}(\etag{t}', \{s : t\}), \etag{t}) = \\
+    & \qquad \textbf{if}\ \etag{t} = \etag{t}'\ \textbf{then}\ \langle {s} \rangle\ \textbf{else}\ \dots
+  \end{flalign*}
+  \caption{Configuation generation.}
+  \label{fig:cfg}
+\end{figure}
+
+Now, we call a response well-formed with respect to $d : \fcy{D}$ if and only if
+it returns appropriate data on \ff{lookup}. More formally, for some $r :
 \ff{Resp}$,
 \begin{align*}
-  &r\ \text{well-formed}_{\ff{cfg}} \iff \\
-  &\forall (\etag{t} : \textsf{Tag}).\ \ff{cfg}(\etag{t})\ \text{defined} \Rightarrow \ff{lookup}(\etag{t}, r) : \ff{cfg}(\etag{t})
+  &r\ \text{well-formed}_{d} \iff \\
+  &\ \ \forall (\etag{t} : \textsf{Tag}).\ \ff{cfg}(d, \etag{t})\ \text{defined} \Rightarrow  \\
+  &\qquad \ff{lookup}(\etag{t}, r) : \ff{cfg}(d, \etag{t})
 \end{align*}
-
-When constructing a member of \ff{Cfg}, we must take care that the mapping
-respects entity types. Thus, if \etag{t} is a tag for a free-text entity,
-$\ff{cfg}(\etag{t})$ is allowed to be any string. If, instead, \etag{t} is a tag
-for keywords or trait entities, $\ff{cfg}(\etag{t})$ should return a union of
-literals that represents the appropriate data.
+We will use well-formedness as our basic assumption that the application has
+been configured correctly relative to the response.
 
 \subsection{Response Parsing}
 We discussed above that there is a challenge in parsing the unstructured
@@ -473,7 +506,10 @@ are guaranteed to get one of them back from \ff{lookup}.
   \ff{parseTy}(rec[\ff{lookup}(\etag{t}, r)], r)
 \end{align*}
 The final case for \ff{parse} simply matches the value in the response to an
-index into the record, and interprets that record entry using \ff{parseTy}.
+index into the record, and interprets that record entry using \ff{parseTy}. It
+is important to note that since \ff{interp} returns a union here, we only need
+to return a value that is in some branch of that union. In this case, we use the
+\ff{lookup} value to decide which branch.
 
 We will not write out the full definition of \ff{parseTy}, but note that it is
 fairly automatic. If the type is another declaration, we can call back to
@@ -486,11 +522,10 @@ We would like to bring both parts of the formalism together to show that our
 system works the way we would like it to. The main property that we would like
 to show is that \ff{parse} is correct.
 \begin{theorem}[\ff{parse} Correct]
-  Let $d$ be a declaration in $\fcy{D}$, and generate a configuration, \ff{cfg},
-  from $d$. Then,
+  Let $d$ be a declaration in $\fcy{D}$. Then,
   \begin{flalign*}
     &\forall\ (r : \textsf{Resp}).\\
-    &r\ \text{well-formed}_{\ff{cfg}} \Rightarrow \ff{parse}(d, r)\ \text{defined}
+    &r\ \text{well-formed}_d \Rightarrow \ff{parse}(d, r)\ \text{defined}
   \end{flalign*}
 \end{theorem}
 \begin{proof}
@@ -500,6 +535,35 @@ Note that since \ff{parse} is a dependent function, it will already return a
 value of the correct type. Thus, we only need to care that it is defined.
 
 \section{Implementation} \label{implementation}
+\begin{figure*}
+  \centering
+  \begin{tikzpicture}[node distance = 3cm, auto]
+    \node [block] (types) {Type DSL};
+    \node [block, right of=types] (decls_hs) {Decl (hs)};
+    \node [block, right of=decls_hs] (decls_ts) {Runtypes (ts)};
+    \node [block, below of=decls_ts] (cfg) {NLU Config};
+    \node [block, above of=decls_ts] (ts_types) {Types (ts)};
+    \node [cloud, right of=decls_ts] (ts) {Opal};
+    \node [cloud, right of=cfg] (backend) {Wit};
+
+    \path [line] (types) -- (decls_hs);
+    \path [line] (decls_hs) -- (decls_ts);
+    \path [line] (decls_hs) -- (cfg);
+    \path [line] (decls_hs) -- (ts_types);
+    \path [line] (decls_ts) -- (ts);
+    \path [line] (ts_types) -- (ts);
+    \path [line] (cfg) -- (backend);
+  \end{tikzpicture}
+  \caption{The configuration process.}
+  \label{fig:process}
+\end{figure*}
+A high-level workflow for our implementation is shown in Figure
+\ref{fig:process}. The programmer writes types in our DSL, and uses our Haskell
+tool to parse the declarations. The tool serializes three artifacts: a set of
+TypeScript type declarations, a runtypes datastructure, and a set of JSON
+configuration files for Wit. The programmer simply imports the types and
+runtypes into their Opal project, uploads the JSON files to Wit, and the system
+is ready to go.
 
 \subsection{Configuration Tool}
 When a user wants to configure an Opal application to interact with an NLU
@@ -510,13 +574,15 @@ application.
 
 Our configuration tool is written in Haskell, and is designed to be simple and
 obviously correct. We use the Parsec library to parse the type DSL into the
-intermediate representation mentioned in Figure \ref{fig:hs_ast}.
+intermediate representation mentioned in Figure \ref{fig:hs_ast}.\cite{parsec}
 
 \begin{figure}
 \begin{minted}{haskell}
   data Decl = FreeText String
-            | Keywords String [String]
-            | Trait String [(String, Ty)]
+            | Keywords String
+                       [String]
+            | Trait String
+                    [(String, Ty)]
             | Alias String Ty
             deriving (Show)
 
@@ -528,6 +594,10 @@ intermediate representation mentioned in Figure \ref{fig:hs_ast}.
   \caption{The Haskell code for our AST.}
   \label{fig:hs_ast}
 \end{figure}
+
+After parsing with Parsec, we apply versions of the \ff{interp} and \ff{cfg}
+functions from Section \ref{formalism} to generate the appropriate
+configuration.
 
 \subsection{Runtime Library}
 At run-time typical application using NLU will go through a fairly consistent
@@ -551,9 +621,12 @@ provide in the Opal library is similar, but there are two important differences.
 First, the parse function takes some element of $\fcy{D}$, which it uses to
 deduce the structure of the desired output. In the real application, the analog
 of $\fcy{D}$ is the \hs{Decl} type in the Haskell code; this is not available to
-the Opal application at run time. As mentioned above, we get around this by
-using a modified version the runtypes library to keep this information around at
-run-time. We extend runtypes to include a type for entities---which map to
+the Opal application at run time.
+
+We get around this by using a modified version the a TypeScript library called
+Runtypes.\cite{runtypes} Runtypes allows us to to serialize declarations
+directly into TypeScript and therefore to keep necessary information around at
+run-time. We extend Runtypes to include a type for entities---which map to
 declarations in $\fcy{D}$. Runtypes provides the infrastructure for non-entity
 types in $\fcy{T}$.
 
@@ -571,18 +644,97 @@ and runtype parameters.
 
 \begin{figure*}
 \begin{minted}{typescript}
-          public parse<T>(rt: Runtype<any>, res: Response): T {
-              return rt.check(this._parse(rt, res)) as T;
-          }
+            public parse<T>(rt: Runtype<any>, res: Response): T {
+                return rt.check(this._parse(rt, res)) as T;
+            }
 
-          private _parse(rt: Runtype<any>, res: Response): any { ... }
+            private _parse(rt: Runtype<any>, res: Response): any { ... }
 \end{minted}
   \caption{The wit parse functions.}
   \label{fig:parse}
 \end{figure*}
 
 \section{Evaluation} \label{evaluation}
-%TODO: Cover limitations of the design, possible use-cases, etc
+Working with the system to build some toy applications led us to a number of
+important conclusions about its effectiveness. We discuss a number of these
+conclusions here.
+
+\subsection{Type Expressiveness}
+The first important thing we found when starting to write types in our DSL is
+that the standard three entity types are not quite expressive enough for real
+applications. For example, when trying to implement a small chatbot for
+scheduling calendar meetings, we wanted to write something like,
+\begin{minted}{typescript}
+  free-text Person
+  ...
+  trait Intent = <Schedule> {
+    person: Person,
+    date: Date,
+    time: Time
+  }
+\end{minted}
+but we found that we had no way to express a date or a time. Technically
+speaking, it might have been possible to encode dates and times as free-text and
+do a second parsing pass in the application code, but that solution is far from
+elegant. We discuss one potential solution to this problem in Section
+\ref{future>types}.
+
+\subsection{Programmer Freedom}
+When working around unsupported types, there is an obvious tendency to modify
+the application types to better fit the capabilities of the system. It turns out
+that this occurs in more cases than just using dates and times. For example,
+consider another calendar example, similar to the one above.
+\begin{minted}{typescript}
+keywords WkDay = "Sunday" | ...
+alias Abs = {
+  day: WkDay
+  person: Person
+}
+keywords RDay = "today" | "tomorrow"
+alias Rel = {
+  day: RDay
+  person: Person
+}
+trait Intent =
+  | <Absolute> Abs
+  | <Relative> Rel
+\end{minted}
+Here, we've done away with the complications of dates and times, and we just
+allow a user to specify a day of the week or a ``relative day.'' The interesting
+observation here is that this is likely not the way that most TypeScript/Opal
+developers would write this type. For example, one reasonable alternative might
+express days as a top-level disjunction, and then make the type of intents a
+normal record.
+\begin{minted}{typescript}
+  type Day =
+    | { tag: "today" }
+    | { tag: "tomorrow" }
+    | { tag: "abs", day: WkDay }
+  type Intent =
+    { day: Day, person: Person }
+\end{minted}
+This makes sense, since \ts{Absolute} and \ts{Relative} are not actully
+different \emph{intents}, per se. We can see that the system has led us to a
+different type than we would normally write.
+
+It turns out that this might actually be a good thing, if viewed from the
+perspective of the NLU engine itself. While \ts{Absolute} and \ts{Relative} are
+the same intent from a philosophical perspective, they might be parsed very
+differently. The utterance
+\begin{center}
+  \emph{Schedule my Wednesday meeting with Chris.}
+\end{center}
+is very different in structure from
+\begin{center}
+  \emph{Set a meeting with James tomorrow.}
+\end{center}
+Thus, it might be the case that forcing the programmer to write slightly
+different types will make it much easier for the NLU backend to find the correct
+information.
+
+Overall, there is likely some work to be done in terms of making our types more
+idiomatic, but for now we err on the side of making life easier for the NLU
+engine.
 
 \section{Future Work} \label{future}
 Moving forward, we hope to take this work in two main directions---wider support
@@ -593,7 +745,7 @@ Expanding support for more entity types and backends is an obvious way to
 increase the usefulness of our work. Here, we discuss both of those extensions
 in detail.
 
-\subsubsection{More Types}
+\subsubsection{More Types} \label{future>types}
 In addition to the three ``universal'' kinds of entities (free-text, keywords,
 and traits), the Wit NLU engine provides more specialized ways of looking up
 entities. Wit provides support for parsing numbers, dates, times, and other
@@ -656,6 +808,7 @@ and safe interface for natural langauge interaction. This work contributes a
 real, working tool in the Opal ecosystem that provides a first attempt at such
 an interface.
 
+% TODO: Fix bib formatting
 \bibliography{paper}{}
 \bibliographystyle{plain}
 
