@@ -580,7 +580,7 @@ Our configuration tool is written in Haskell, and is designed to be simple and
 obviously correct. We use the Parsec library to parse the type DSL into the
 intermediate representation mentioned in Figure \ref{fig:hs_ast}.\cite{parsec}
 
-\begin{figure}
+\begin{figure}[H]
 \begin{minted}{haskell}
   data Decl = FreeText String
             | Keywords String
@@ -687,7 +687,7 @@ elegant. We discuss one potential solution to this problem in Section
 When working around unsupported types, there is an obvious tendency to modify
 the application types to better fit the capabilities of the system. It turns out
 that this occurs in more cases than just using dates and times. For example,
-consider another calendar example, similar to the one above.
+consider a different set of types for calendar scheduling.
 \begin{minted}{typescript}
 keywords WkDay = "Sunday" | ...
 alias Abs = {
@@ -706,7 +706,7 @@ trait Intent =
 Here, we've done away with the complications of dates and times, and we just
 allow a user to specify a day of the week or a ``relative day.'' The interesting
 observation here is that this is likely not the way that most TypeScript/Opal
-developers would write this type. For example, one reasonable alternative might
+developers would write that type. For example, one reasonable alternative might
 express days as a top-level disjunction, and then make the type of intents a
 normal record.
 \begin{minted}{typescript}
