@@ -82,7 +82,7 @@ was well-trained, and the machine was viewed as a tool for getting the job done.
 Today, computers are our personal assistants. They are integrated with our lives
 and they help everyday people do everyday tasks. Most people who use computers
 today never touch a command shell, and even those who do would often rather not.
-Graphical interfaces are amazingly powerful, and are often good enough to allow
+Graphical interfaces are amazingly powerful, and are often sufficient to allow
 users to easily interact with the computer, but even those have their drawbacks.
 We would really like our personal assistant to respond to commands in human
 language:
@@ -102,7 +102,7 @@ integrate these technologies into their applications by hand. We propose an
 addition to the Opal language that will begin to close this gap.
 
 \subsection{An Example}
-Consider a simple reminder interface to a calendar or other scheduling
+Consider a simple \emph{reminders} interface to a calendar or other scheduling
 assistant. A user might ask the application to set a reminder containing a
 message and a time (for simplicity, we will just allow the user to specify
 \ts{later} or \ts{tomorrow}) or she might ask the application to get any active
@@ -120,10 +120,10 @@ application might express this interface with the following declarations:
     | { tag: "Get", data: {} };
 \end{minted}
 
-Since we would like to interact with this application via human language, we
-need some way of converting a user \emph{utterance} to something of type
-\ts{Intent}. Figure \ref{fig:drycleaning} shows the desired
-data representation of a user utterance.
+We would like to interact with this application via human language, so we need
+some way of converting a user's \emph{utterance} to something of type
+\ts{Intent}. Figure \ref{fig:drycleaning} shows the desired data representation
+of a user utterance.
 
 \begin{figure}
 \begin{minted}{typescript}
@@ -197,7 +197,7 @@ of text from the utterance. In our example, the message is a free text entity.
   \ts{tomorrow} would be captured via keyword searching.
 \item[Trait] These are slightly more abstract. Traits capture something that is
   a quality of the utterance as a whole. Something like a user's intent or even
-  mood could be a trait.
+  their mood could be a trait.
 \end{description}
 
 To some, these lookup strategies might seem like an implementation detail, but
@@ -212,8 +212,8 @@ section \ref{formalism}.
 
 \subsection{The DSL}
 With our observations about search strategies in mind, we can write our types
-from before in a slightly different way. Figure \ref{fig:dsl_decls} same type
-declarations from Section \ref{introduction} written in our DSL.
+from before in a slightly different way. Figure \ref{fig:dsl_decls} shows the
+same type declarations from Section \ref{introduction} written in our DSL.
 
 \begin{figure}
 \begin{minted}{typescript}
@@ -232,7 +232,7 @@ declarations from Section \ref{introduction} written in our DSL.
 \end{figure}
 
 The main thing to notice is that the keyword \ts{type} has been replaced by
-entity declarations \ts{free-text}, \ts{keywords}, and \ts{trait}, as well as
+entity declarations \ts{free-text}, \ts{keywords}, and \ts{trait}, or by
 \ts{alias}. There are a number of benefits of entity declarations. First and
 foremost, it allows the user to explicitly define the NLU engine configuration
 alongside the program types. With types defined in our DSL, we can automatically
@@ -242,10 +242,10 @@ guaranteed to be either \ts{"later"} or \ts{"tomorrow"}. This alone solves a lot
 of the problems that tend to come up when writing these types of applications.
 
 Another benefit of these bespoke declaration forms is simplified syntax. When a
-\ts{free-text} entity is declared, there is no need to write ``\ts{= string}'',
+\ts{free-text} entity is declared, there is no need to write ``\ts{= string},''
 because that is implied by the search strategy. Similarly, since traits are
 always tagged unions, we can write them in (almost) ML syntax, rather than
-writing out the idiomatic TypeScript workaround.
+writing out the standard TypeScript workaround.
 
 Finally, writing specific entity declarations rather than just \ts{type}, makes
 it clear that there is more going on than a direct translation into TypeScript.
@@ -273,11 +273,11 @@ if they were allowed---we enforce those conditions in the DSL.
 Figure \ref{fig:ast} shows the AST that is produced when we parse the DSL.
 Looking at this, it also becomes clear that the limitations on the types allowed
 in a trait declaration are fairly strict. As of writing, there are only three
-types allowed within a trait declaration: previously defined entities, literals,
-and records (where each element is subject to the same restrictions). These
-limitations match up with the capabilities of NLU engines in general. While many
-backends provide the ability to parse numbers, dates, and other data, these
-types of entities are implementation specific. In Section \ref{future}, we
+types allowed within a trait declaration: previously defined declarations,
+literals, and records (where each element is subject to the same restrictions).
+These limitations match up with the capabilities of NLU engines in general.
+While many backends provide the ability to parse numbers, dates, and other data,
+these types of entities are implementation specific. In Section \ref{future}, we
 discuss plans to expand the allowed types in a modular way.
 
 \subsection{NLU Engine Responses}
@@ -335,8 +335,8 @@ not reuse entities.
 
 \section{Formalism} \label{formalism}
 In order to reason about the correctness of our translations, we have formalized
-the results from Section \ref{description}. We begin by formalizing the type DSL
-as shown in Figure \ref{fig:grammar_a}.
+the results from Section \ref{description}. We begin by writing down a core
+language for the type DSL as shown in Figure \ref{fig:grammar_a}.
 \begin{figure}
   \centering
   \begin{subfigure}{1\linewidth}
@@ -348,16 +348,16 @@ as shown in Figure \ref{fig:grammar_a}.
       \fcy{T} ::=&\ \fcy{D} \mid \ell \mid \{s: \fcy{T}\}
     \end{align*}
     $$ \etag{t} \in \ff{Tag} \qquad \ell, s \in \textbf{string} $$
-    \caption{Type DSL}
+    \caption{The core language.}
     \label{fig:grammar_a}
   \end{subfigure}\vspace{1cm}
   \begin{subfigure}{1\linewidth}
     $$ \tau ::=\ \textbf{string} \mid \ell \mid \{s: \tau\} \mid \langle \tau
     \rangle $$
-    \caption{Relevant Opal Types}
+    \caption{Opal types.}
     \label{fig:grammar_b}
   \end{subfigure}
-  \caption{The core language.}
+  \caption{Formal structures.}
 \end{figure}
 There are similarities between these definitions and the ones in Figure
 \ref{fig:ast}, but the core language has some slightly different goals. First,
@@ -374,9 +374,12 @@ In addition to a grammar for the core language itself, in Figure
 as representing the final form of the data that a user hopes to obtain, with no
 information about the entities that generated the data. They map almost directly
 into types that are used by the underlying Opal system. We add a few types that
-are noteworthy: the type {\bf string} is added to account for FreeText entities;
-and $\langle {\tau} \rangle$ represents an arbitrary union, and covers the cases
-of Keywords and Trait entities.
+are noteworthy. The type {\bf string} is added to account for FreeText entities.
+The type $\langle {\tau} \rangle$ represents an arbitrary union and covers the
+cases of Keywords and Trait entities.\footnote{This notation is slightly
+unconventional, but we prefer to write $\langle \tau \rangle$ or $\langle \tau_1
+\mid \dots \mid \tau_n \rangle$ rather than simply $\tau_1 \mid \dots \mid
+\tau_n$ to separate it from the surrounding syntax.}
 
 As mentioned above, user's view of their system can be formalized as a top-level
 declaration generated by $\fcy{D}$. Since this declaration encompases both type
@@ -408,7 +411,8 @@ We implement \ff{interp} and \ff{interpTy} in Figure \ref{fig:interp}.
 
 One interesting thing to point out is that the record in the Trait declarations
 becomes a union type. This makes sense, since a trait represents a property of
-the utterance as a whole, and thus can decide the structure of the response.
+the utterance as a whole, and thus can decide the structure of the rest of the
+response.
 
 With the basic building blocks defined, we can move forward in formalizing our
 system.
@@ -435,7 +439,7 @@ stated explicitly rather than assumed by default.
 
 The \ff{lookup} function always returns a string, but the string might mean any
 number of things. The data might be a particular literal, in the case of a
-keywords or trait entity, or an entire phrase in the case of a free-text entity.
+keywords or trait entity, or an entire phrase in the case of a free text entity.
 We define configurations as functions that map a subset of entity tags to the
 type of data expected for those entities. The function \ff{cfg} takes a
 declaration and produces a configuration for that declaration.
@@ -458,15 +462,15 @@ capturing every tag in the declaration.
 \end{figure}
 
 Now, we call a response well-formed with respect to $d : \fcy{D}$ if and only if
-it returns appropriate data on \ff{lookup}. More formally, for some $r :
-\ff{Resp}$,
+it returns appropriate data on \ff{lookup}. More formally, we say that for some
+$r : \ff{Resp}$,
 \begin{align*}
   &r\ \text{well-formed}_{d} \iff \\
   &\ \ \forall (\etag{t} : \textsf{Tag}).\ \ff{cfg}(d, \etag{t})\ \text{defined} \Rightarrow  \\
   &\qquad \ff{lookup}(\etag{t}, r) : \ff{cfg}(d, \etag{t})
 \end{align*}
-We will use well-formedness as our basic assumption that the application has
-been configured correctly relative to the response.
+We will use well-formedness as our basic signal that a the application and the
+response have been configured to be compatible.
 
 \subsection{Response Parsing}
 We discussed above that there is a challenge in parsing the unstructured
@@ -489,7 +493,7 @@ generated by $d$, $\ff{parse}(d, r)$ is undefined. Otherwise, we define
 \begin{align*}
   \ff{parse}(\text{FreeText}(\etag{t}), r) = \ff{lookup}(\etag{t}, r)
 \end{align*}
-This case is fairly straightforward. Since the interpretation of a free-text
+This case is fairly straightforward. Since the interpretation of a free text
 entity is just a {\bf string}, we can simply look up the value of the
 appropriate entity from the response.
 \begin{align*}
@@ -540,7 +544,7 @@ value of the correct type. Thus, we only need to care that it is defined.
   \begin{tikzpicture}[node distance = 3cm, auto]
     \node [block] (types) {Type DSL};
     \node [block, right of=types] (decls_hs) {Decl (hs)};
-    \node [block, right of=decls_hs] (decls_ts) {Runtypes (ts)};
+    \node [block, right of=decls_hs] (decls_ts) {AST (ts)};
     \node [block, below of=decls_ts] (cfg) {NLU Config};
     \node [block, above of=decls_ts] (ts_types) {Types (ts)};
     \node [cloud, right of=decls_ts] (ts) {Opal};
@@ -558,17 +562,16 @@ value of the correct type. Thus, we only need to care that it is defined.
   \label{fig:process}
 \end{figure*}
 A high-level workflow for our implementation is shown in Figure
-\ref{fig:process}. The programmer writes types in our DSL, and uses our Haskell
+\ref{fig:process}. The programmer writes types in our DSL and uses our Haskell
 tool to parse the declarations. The tool serializes three artifacts: a set of
-TypeScript type declarations, a runtypes datastructure, and a set of JSON
-configuration files for Wit. The programmer simply imports the types and
-runtypes into their Opal project, uploads the JSON files to Wit, and the system
-is ready to go.
+TypeScript type declarations, an AST datastructure, and a set of JSON
+configuration files for Wit. The programmer simply imports the types and AST
+into their Opal project, uploads the JSON files to Wit, and the system is ready
+to go.
 
 \subsection{Configuration Tool}
 When a user wants to configure an Opal application to interact with an NLU
-library like Wit, they begin by using our configuration tool. The tool turns
-code in the type DSL into TypeScript code and JSON configuration, and ensures
+library like Wit, they begin by using our configuration tool. The tool ensures
 that the NLU engine responses will agree with the type definitions in the user's
 application.
 
@@ -599,8 +602,8 @@ After parsing with Parsec, we apply versions of the \ff{interp} and \ff{cfg}
 functions from Section \ref{formalism} to generate the appropriate
 configuration.
 
-\subsection{Runtime Library}
-At run-time typical application using NLU will go through a fairly consistent
+\subsection{Run-time Library}
+At run-time, a typical application using NLU will go through a fairly consistent
 cycle.
 \begin{enumerate}
 \item Ask user for input, converting voice to text if necessary.
@@ -613,7 +616,7 @@ a library which handles steps 2 and 4. For each backend that Opal
 supports,\footnote{At the time of writing, Wit is the only supported backend.}
 we provide utilities for querying the API and parsing the response data. The
 network code involved in obtaining the response is fairly uninteresting, so we
-will focus on the parsing,
+will focus on the parsing.
 
 In section \ref{formalism}, we outline the parse function, which takes a
 declaration and a response and generates an Opal object. The function that we
@@ -631,16 +634,16 @@ declarations in $\fcy{D}$. Runtypes provides the infrastructure for non-entity
 types in $\fcy{T}$.
 
 The other difference arises because Opal does not have dependent types. We
-cannot completely faithfully transcribe the parse function from above, because
-it is not obvious that it can be typed at all. The solution here is to combine
-Opal's dynamic typing with runtypes' dynamic checking feature to create a
-function that appears to be dependently typed. First, we use dynamic types
-within the parse function. While building the response data, we assume, where
+cannot completely faithfully transcribe the \ff{parse} function from above,
+because it is not obvious that it can be typed at all. The solution here is to
+combine Opal's dynamic typing with Runtypes' dynamic checking feature to create
+a function that appears to be dependently typed. First, we use dynamic types
+within the \ff{parse}. While building a response object, we assume, where
 necessary, that it has type \ts{any}. Then, once parsing is complete, we use the
-runtypes object to check the parsed object, and we cast it to the desired type.
-The definition is shown in Figure \ref{fig:parse}. The cast is safe, so long as
-the user respects the invariant that parse is always called with compatible type
-and runtype parameters.
+Runtypes object to check the parsed result, and we cast the result to the
+desired type. The definition is shown in Figure \ref{fig:parse}. The cast is
+safe, so long as the user respects the invariant that parse is always called
+with compatible type and runtype parameters.
 
 \begin{figure*}
 \begin{minted}{typescript}
@@ -674,7 +677,7 @@ scheduling calendar meetings, we wanted to write something like,
   }
 \end{minted}
 but we found that we had no way to express a date or a time. Technically
-speaking, it might have been possible to encode dates and times as free-text and
+speaking, it might have been possible to encode dates and times as free text and
 do a second parsing pass in the application code, but that solution is far from
 elegant. We discuss one potential solution to this problem in Section
 \ref{future>types}.
@@ -730,11 +733,19 @@ is very different in structure from
 \end{center}
 Thus, it might be the case that forcing the programmer to write slightly
 different types will make it much easier for the NLU backend to find the correct
-information.
-
-Overall, there is likely some work to be done in terms of making our types more
-idiomatic, but for now we err on the side of making life easier for the NLU
+information. There is likely some work to be done in terms of making our types
+more idiomatic, but for now we err on the side of making life easier for the NLU
 engine.
+
+\subsection{Relative Success}
+There is still a lot to be done on this work and in this space, but as of
+writing, we feel that we have proven the concept fairly well. The system does
+the job it intends to, and is usable for actual applications. In general, using
+the tools feels fairly natural. The Haskell tool produces the output that a user
+would expect, and the programming interface provides the functionality that a
+user needs to actually write an application that uses NLU. Overall, we are happy
+with our approach to the stated problem as well as with the results of the
+implementation.
 
 \section{Future Work} \label{future}
 Moving forward, we hope to take this work in two main directions---wider support
@@ -746,7 +757,7 @@ increase the usefulness of our work. Here, we discuss both of those extensions
 in detail.
 
 \subsubsection{More Types} \label{future>types}
-In addition to the three ``universal'' kinds of entities (free-text, keywords,
+In addition to the three ``universal'' kinds of entities (free text, keywords,
 and traits), the Wit NLU engine provides more specialized ways of looking up
 entities. Wit provides support for parsing numbers, dates, times, and other
 specific forms of text. We elected to keep things simple at first and exclude
