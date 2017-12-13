@@ -9,10 +9,12 @@
 \usepackage[bottom]{footmisc}
 \usepackage[hidelinks]{hyperref}
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{amsthm}
 \usepackage{fixme}
 \usepackage{xcolor}
 \usepackage{subcaption}
+\usepackage{cite}
 
 \usepackage{tikz}
 \usetikzlibrary{shapes,arrows}
@@ -89,27 +91,23 @@ language:
 \item ``Ok Google. Navigate to my hotel.''
 \item ``Slackbot, set my status to active.''
 \end{itemize}
-This is the realm of Natural Language Understanding (NLU)\footnote{We do not
+This is the realm of Natural Language Understanding (NLU).\footnote{We do not
   distinguish between spoken or written language when talking about NLU in
-  general.}.
+  general.}
 
 We have seen a huge growth in NLU applications in recent years, and we will
 likely see more. Unfortunately, there has been no serious effort made to make
 this power available at the language level, so programmers have been forced to
-integrate these technologies into their applications by hand. (In fact, machine
-learning in general has been relatively neglected by the programming languages
-community.) We propose an addition to the Opal language that will begin to close
-this gap.
+integrate these technologies into their applications by hand. We propose an
+addition to the Opal language that will begin to close this gap.
 
 \subsection{An Example}
 Consider a simple reminder interface to a calendar or other scheduling
 assistant. A user might ask the application to set a reminder containing a
 message and a time (for simplicity, we will just allow the user to specify
-\ts{later} or \ts{tomorrow}) or she
-might ask the application to get any active reminders. Since Opal is embedded
-in Typescript, a typical Opal application might express this interface with the
-following declarations:\footnote{An overview of Typescript's type system can be
-  found at \url{www.typescriptlang.org}.}
+\ts{later} or \ts{tomorrow}) or she might ask the application to get any active
+reminders. Since Opal is embedded in TypeScript,\cite{typescript} a typical Opal
+application might express this interface with the following declarations:
 \begin{minted}{typescript}
   type Msg = string;
   type Time = "later" | "tomorrow";
@@ -160,23 +158,23 @@ integrated with Opal applications.
 \\
 
 We will begin by presenting a technical description of our type language in
-section \ref{description}. In section \ref{formalism}, we present a formal
+Section \ref{description}. In Section \ref{formalism}, we present a formal
 specification for the language our type-directed response parsing algorithm.
 Section \ref{implementation} covers the implementation of the language and
-related libraries. Finally, sections \ref{evaluation} and \ref{future} present
+related libraries. Finally, Sections \ref{evaluation} and \ref{future} present
 an evaluation of our work, and our plans for future work, respectively.
 
 \section{Language Description} \label{description}
 For our initial work, we elected to focus on building a system to support a
 single NLU backend---specifically, we are working with an NLU engine called
-Wit.\fxnote{[CITE]} When configuring Wit, as with many NLU backends, the main
-task is setting up the \emph{entities} that Wit should be looking for. An entity
-is a discrete piece of information that the NLU engine extracts from an
-utterance. In our example, the messages and the time are both entites, as is the
-user's intent.
+Wit.\cite{wit} When configuring Wit, as with many NLU backends, the main task is
+setting up the \emph{entities} that Wit should be looking for. An entity is a
+discrete piece of information that the NLU engine extracts from an utterance. In
+our example, the messages and the time are both entites, as is the user's
+intent.
 
 \subsection{Search Strategies}
-When entities are declared, the user must specify a ``search strategy''. In the
+When entities are declared, the user must specify a ``search strategy.'' In the
 case of Wit, there are three main strategies:
 \begin{description}
 \item[Free Text] Entities that are found via free text matching are just strings
@@ -202,7 +200,7 @@ section \ref{formalism}.
 \subsection{The DSL}
 With our observations about search strategies in mind, we can write our types
 from before in a slightly different way. Figure \ref{fig:dsl_decls} same type
-declarations from section \ref{introduction} written in our DSL.
+declarations from Section \ref{introduction} written in our DSL.
 
 \begin{figure}
 \begin{minted}{typescript}
@@ -234,29 +232,27 @@ Another benefit of these bespoke declaration forms is simplified syntax. When a
 \ts{free-text} entity is declared, there is no need to write ``\ts{= string}'',
 because that is implied by the search strategy. Similarly, since traits are
 always tagged unions, we can write them in (almost) ML syntax, rather than
-writing out the idiomatic Typescript workaround.
+writing out the idiomatic TypeScript workaround.
 
 Finally, writing specific entity declarations rather than just \ts{type}, makes
-it clear that there is more going on than a direct translation into Typescript.
+it clear that there is more going on than a direct translation into TypeScript.
 In fact, the DSL parser does lot of validation to guarantee that only reasonable
 types can be written down. For example, a \ts{keywords} declaration is required
 to be a union, and that union must contain only literals. Even the \ts{alias}
-keyword has some validation built in. Some Typescript types would be problematic
+keyword has some validation built in. Some TypeScript types would be problematic
 if they were allowed---we enforce those conditions in the DSL.
 
 \begin{figure}
-\begin{minted}{haskell}
-  data Decl = FreeText String
-            | Keywords String [String]
-            | Trait String [(String, Ty)]
-            | Alias String Ty
-            deriving (Show)
-
-  data Ty = Def String
-          | Lit String
-          | Rec [(String, Ty)]
-          deriving (Show)
-\end{minted}
+  \centering
+  \begin{align*}
+    \mathbb{D} ::=&\ \text{FreeText}(\etag{t}) \\
+    |&\ \text{Keywords}(\etag{t},\ [\ell]) \\
+    |&\ \text{Trait}(\etag{t},\ \{s: \mathbb{T}\}) \\
+    |&\ \text{Alias}(\etag{t},\ \mathbb{T}) \\
+    \\
+    \mathbb{T} ::=&\ \text{Def}(\etag{t}) \mid \ell \mid \{s: \mathbb{T}\}
+  \end{align*}
+  $$ \etag{t} \in \ff{Tag} \qquad \ell, s \in \textbf{string} $$
   \caption{The abstract syntax tree for our DSL.}
   \label{fig:ast}
 \end{figure}
@@ -268,7 +264,7 @@ types allowed within a trait declaration: previously defined entities, literals,
 and records (where each element is subject to the same restrictions). These
 limitations match up with the capabilities of NLU engines in general. While many
 backends provide the ability to parse numbers, dates, and other data, these
-types of entities are implementation specific. In section \ref{future}, we
+types of entities are implementation specific. In Section \ref{future}, we
 discuss plans to expand the allowed types in a modular way.
 
 \subsection{NLU Engine Responses}
@@ -326,24 +322,24 @@ just during setup.
   \label{fig:process}
 \end{figure*}
 
-We elected to use a Typescript library called \emph{runtypes} to serialize the
-AST directly into Typescript; this gives us a data structure to guide response
+We elected to use a TypeScript library called \emph{runtypes} to serialize the
+AST directly into TypeScript; this gives us a data structure to guide response
 parsing, and also provides us a way to dynamically type-check the results. We
-discuss the response parsing algorithm in more detail in section
+discuss the response parsing algorithm in more detail in Section
 \ref{implementation}.
 
 Figure \ref{fig:process} shows process of configuring an application for NLU
 interaction. The programmer writes types in our DSL, and uses our Haskell tool
 to parse the declarations. The tool serializes three artifacts: a set of
-Typescript type declarations, a runtypes datastructure, and a set of JSON
+TypeScript type declarations, a runtypes datastructure, and a set of JSON
 configuration files for Wit. The programmer simply imports the types and
 runtypes into their Opal project, uploads the JSON files to Wit, and the system
 is ready to go.
 
 \section{Formalism} \label{formalism}
 In order to reason about the correctness of our translations, we have formalized
-the results from section \ref{description}. We begin by formalizing the type DSL
-as shown in figure \ref{fig:grammar_a}.
+the results from Section \ref{description}. We begin by formalizing the type DSL
+as shown in Figure \ref{fig:grammar_a}.
 \begin{figure}
   \centering
   \begin{subfigure}{1\linewidth}
@@ -364,26 +360,26 @@ as shown in figure \ref{fig:grammar_a}.
     \caption{Relevant Opal Types}
     \label{fig:grammar_b}
   \end{subfigure}
-  \caption{Formal grammars.}
+  \caption{The core language.}
 \end{figure}
-There are similarities between these definitions and the Haskell ones in figure
-\ref{fig:ast}, but these have some slightly different goals. First, we remove
-aliases and require that all type definitions are written ``in-line''. Next,
-rather than split the definition by allowing tags within $\fcy{T}$, we also
-require that entitiy definitions are inlined. This means that the data a user
-expects from the NLU backend can be represented by a single tree of type
+There are similarities between these definitions and the ones in Figure
+\ref{fig:ast}, but the core language has some slightly different goals. First,
+we remove aliases and require that all type definitions are written ``in-line.''
+Next, rather than split the definition by allowing tags within $\fcy{T}$, we
+also require that entity definitions are inlined. This means that the data a
+user expects from the NLU backend can be represented by a single tree of type
 $\fcy{D}$. Importantly, none of these simplifications are fundamental---this
 formulation can represent the same types as the actual system. This approach
 simply gives up some usability to simplify reasoning.
 
-In addition to a grammar for the DSL itself, in figure \ref{fig:grammar_b} we
-define a grammar of types, $\tau$. We can think of $\tau$ as representing the
-final form of the data that a user hopes to obtain, with no information about
-the entities that generated the data. They map almost directly into types that
-are used by the underlying Opal system. We add a few types that are noteworthy:
-the type {\bf string} is added to account for FreeText entities; and $\langle
-{\ell} \rangle$ represents a disjunction of literals, and covers the case of
-Keywords entities.
+In addition to a grammar for the core language itself, in Figure
+\ref{fig:grammar_b} we define a grammar of types, $\tau$. We can think of $\tau$
+as representing the final form of the data that a user hopes to obtain, with no
+information about the entities that generated the data. They map almost directly
+into types that are used by the underlying Opal system. We add a few types that
+are noteworthy: the type {\bf string} is added to account for FreeText entities;
+and $\langle {\ell} \rangle$ represents a disjunction of literals, and covers
+the case of Keywords entities.
 
 As mentioned above, user's view of their system can be formalized as a top-level
 declaration generated by $\fcy{D}$. Since this declaration encompases both type
@@ -415,9 +411,9 @@ that is compatible with that entity's declaration. We define a type,
 the following type:
 $$ \ff{lookup}\ :\ \ff{Tag} \to \ff{Resp} \rightharpoonup \textbf{string} $$
 Note that the function is partial; there is no guarantee that the response will
-contain the desired data. In the sequel, we will often assume that \ff{lookup}
-is defined on tags we care about, but that assumption will be stated explicitly
-rather than assumed by default.
+contain the desired data. In the following development, we will often assume
+that \ff{lookup} is defined on tags we care about, but that assumption will be
+stated explicitly rather than assumed by default.
 
 The \ff{lookup} function always returns a string, but the string might mean any
 number of things. The data might be a particular literal, in the case of a
@@ -481,7 +477,7 @@ index into the record, and interprets that record entry using \ff{parseTy}.
 
 We will not write out the full definition of \ff{parseTy}, but note that it is
 fairly automatic. If the type is another declaration, we can call back to
-\ff{parse}, if it is a literal we simply generate the appropriate string, and if
+\ff{parse}: if it is a literal we simply generate the appropriate string; and if
 it is a record, we build the appropriate record and recursively build out its
 fields.
 
@@ -508,13 +504,30 @@ value of the correct type. Thus, we only need to care that it is defined.
 \subsection{Configuration Tool}
 When a user wants to configure an Opal application to interact with an NLU
 library like Wit, they begin by using our configuration tool. The tool turns
-code in the type DSL into Typescript code and JSON configuration, and ensures
+code in the type DSL into TypeScript code and JSON configuration, and ensures
 that the NLU engine responses will agree with the type definitions in the user's
 application.
 
 Our configuration tool is written in Haskell, and is designed to be simple and
 obviously correct. We use the Parsec library to parse the type DSL into the
-intermediate representation mentioned above in figure \ref{fig:ast}.
+intermediate representation mentioned in Figure \ref{fig:hs_ast}.
+
+\begin{figure}
+\begin{minted}{haskell}
+  data Decl = FreeText String
+            | Keywords String [String]
+            | Trait String [(String, Ty)]
+            | Alias String Ty
+            deriving (Show)
+
+  data Ty = Def String
+          | Lit String
+          | Rec [(String, Ty)]
+          deriving (Show)
+\end{minted}
+  \caption{The Haskell code for our AST.}
+  \label{fig:hs_ast}
+\end{figure}
 
 \subsection{Runtime Library}
 At run-time typical application using NLU will go through a fairly consistent
@@ -552,7 +565,7 @@ function that appears to be dependently typed. First, we use dynamic types
 within the parse function. While building the response data, we assume, where
 necessary, that it has type \ts{any}. Then, once parsing is complete, we use the
 runtypes object to check the parsed object, and we cast it to the desired type.
-The definition is shown in figure \ref{fig:parse}. The cast is safe, so long as
+The definition is shown in Figure \ref{fig:parse}. The cast is safe, so long as
 the user respects the invariant that parse is always called with compatible type
 and runtype parameters.
 
@@ -610,7 +623,7 @@ project. The following are two of the many ideas that we have had.
 Up to this point, we have assumed very little about the data returned in the NLU
 response. In practice, however, many NLU engines provide more than just
 information about the matched entities. Wit, in particular, provides confidence
-levels for each entitiy that it finds. Thus, a value like \ts{"Set"} might be
+levels for each entity that it finds. Thus, a value like \ts{"Set"} might be
 paired with a confidence level of $70\%$, meaning that Wit is $70\%$ sure that
 the user's intent is actually to set a new reminder.
 
@@ -642,5 +655,8 @@ more popular as a user interface, it makes sense that Opal would provide a clean
 and safe interface for natural langauge interaction. This work contributes a
 real, working tool in the Opal ecosystem that provides a first attempt at such
 an interface.
+
+\bibliography{paper}{}
+\bibliographystyle{plain}
 
 \end{document}
