@@ -1,3 +1,0 @@
-1. Where do I talk about the fact that lookup needs a way to choose between
-multiple entities of the same type/the limitation that a type only include each
-entitiy once?

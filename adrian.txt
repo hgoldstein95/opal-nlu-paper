@@ -1,0 +1,8 @@
+Where do I talk about the fact that lookup needs a way to choose between
+multiple entities of the same type/the limitation that a type only include each
+entitiy once?
+
+Have you gotten anywhere with examples? I'm trying to figure out what exactly I
+should cover in the evaluation.
+
+What should the conclusion say? I'm a little stuck.
