@@ -798,6 +798,25 @@ new types of entities and as user types get more complicated, it will be useful
 to try multiple parses of a single response. In that case, we can choose between
 different parses using confidence scores.
 
+\noindent \emph{Hypothetical Worlds}\qquad It turns out that this process of
+choosing the parse with the best confidence score is a great application of one
+of Opal's major features---hypothetical worlds. In a perfect world, we would
+allow our parser to generate all possible response objects, compute some
+function based on the confidence values for the entities in the objecs, and
+choose the object with the best value of the function. Writing this code out by
+hand would be tedious, inefficient, and error-prone. Hypothetical worlds give
+this semantics as a language-level feature. When code is executed in a \ts{hyp}
+block, its computation is entirely hypothetical. Multiple \ts{hyp} blocks can be
+run in parallel, and their computations can be observed at specified points.
+Once a particular world is chosen (in this case, by observing the confidence
+function), a sigle world can be ``committed.'' From that point forward, only the
+committed world is treated as real, and the computation can continue with the
+chosen response object.
+
+In the future, we think that hypothetical worlds will open up new opportunities
+for NLU interaction, including the ability to parse responses into more complex
+types.
+
 \subsubsection{Training with Tests}
 A final extension of this project would attempt to close the code/configuration
 gap even further by allowing users to train their NLU application in a way that
